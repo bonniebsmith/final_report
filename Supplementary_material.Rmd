@@ -1,0 +1,225 @@
+---
+title: "Supplementary material for Project 1"
+author: "Bonnie Smith"
+date: "October 21, 2017"
+output: html_document
+---
+
+```{r ,echo=FALSE}
+
+library(rplos)
+library(knitr)
+
+```
+
+### 1.  Inspection of Materials and Methods sections of a sample of articles
+
+We begin by taking a random sample of 12 research articles from each of the 6 journals, filtering on those journals that contain a materials and methods section.
+
+```{r sampling,eval=FALSE,echo=FALSE}
+
+sample(1:2344,12)
+sample(1:1370,12)
+sample(1:4377,12)
+sample(1:6165,12)
+sample(1:5266,12)
+sample(1:4746,12)
+
+```
+
+The results are fixed and recorded below.  Next we read through the Materials and Methods section for each article in our sample, and take note of any statistical techniques that are mentioned.  Out of 72 articles, we observed 3 instances of a statistical technique mentioned in an article for the purpose of stating that the authors did NOT use that technique.  (These are bolded below.) 
+
+Each article is listed by its index when the research articles (having a materials and methods section) from that journal are listed chronologically by publication date.  
+
+```{r ,eval=FALSE,echo=FALSE}
+
+bio_samp=c(1000,1243,1986,1334,310,343,2063,1775,1587,1487,1287,439)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Biology"'),sort='publication_date asc', start=439, limit=1)$data$materials_and_methods
+
+```
+
+**Techniques used in the sampled PLoS Biology articles:**
+
+   * 1000:  ANOVA F-test. chi squared.  Z-test. t-test.  Monte Carlo.  permutation test.  linear regression.  autoregressive model.  causal model.
+   * 1243: t test
+   * 1986:  Kolmogorov-Smirnov test.  t test.  Mann-Whitney U test.
+   * 1334:  ANOVA.  chi-square.  t test.
+   * 310: none mentioned.
+   * 343:  ANOVA.  bootstrap.
+   * 2063: none mentioned.
+   * 1775: none mentioned.
+   * 1587: rare events logistic regression.  linear models.  Generalized linear mixed model with Poisson distribution.
+   * 1487: none mentioned.
+   * 1287: none mentioned.
+   * 439: mixed-model ANOVA.  Fisher's inverse chi-squared.  clustering.  principal component analysis.  
+
+
+```{r ,eval=FALSE,echo=FALSE}
+
+med_samp=c(31,1335,81,803,989,757,227,962,108,263,838,594)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Medicine"'),sort='publication_date asc', start=594, limit=1)$data$materials_and_methods
+
+```
+
+**Techniques used in the sampled PLoS Medicine articles:**
+
+   * 31: t test
+   * 1335:  wavelet transform.  Monte Carlo simulations. t test.  ROC curve. Bland-Altman plots.  DeLong's test.  logistic regression with stepwise forward variable selection.
+   * 81: none mentioned.
+   * 803: receiver operating curve with AUC.
+   * 989: sensitivity analysis.
+   * 757: zero-inflated negative binomial regression.  Poisson regression.  fixed-effect.  **RANDOM EFFECT MODELS WERE NOT USED.**
+   * 227: ANOVA.  nonparametric Mann-Whitney.
+   * 962: regression.  chi-square. Cox proportional hazards.  generalized linear model.
+   * 108: t test.
+   * 263: ANOVA.
+   * 838: Cox regression.  logistic regression.
+   * 594: linear regression.  logistic regression.  random intercept model, mixed effect linear regression.
+
+
+```{r , eval=FALSE,echo=FALSE}
+
+cb_samp=c(3711,3024,836,128,2225,4308,1442,1585,1283,695,2839,3539)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Computational Biology"'),sort='publication_date asc', start=3539, limit=1)$data$materials_and_methods
+
+
+```
+
+**Techniques used in the sampled PLoS Computational Biology articles:**
+
+   * 3711: simulations.  
+   * 3024: Kolmogorov-Smirnov test
+   * 836: Newton-Raphson.  simulation.
+   * 128: kernel density.  **SIMPLE COMPARED TO SPLINES AND WAVELETS.**  trinomial regression.  Monte Carlo simulations.
+   * 2225: Cox.  Kaplan-Meier.  log-rank test.
+   * 4308: non-linear least squares fit.
+   * 1442: cluster.  z-test.
+   * 1585: Monte Carlo simulation.
+   * 1283: supervised learning.  3-fold cross validation.  principal components analysis. receiver operating characteristics (ROC) curve.
+   * 695: ensemble of fitted models, 3-stage optimization.  princial components analysis (PCA).
+   * 2839: principal components analysis (PCA).  conformational Markov network.
+   * 3539: simulated annealing.
+
+```{r,eval=FALSE,echo=FALSE }
+
+gen_samp=c(4649,3182,3688,4099,4339,2802,1897,3987,3940,4247,1658,2155)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Genetics"'),sort='publication_date asc', start=2155, limit=1)$data$materials_and_methods
+
+```
+
+**Techniques used in the sampled PLoS Genetics articles:**
+
+   * 4649: nearest neighbor.  bootstrap.
+   * 3182: ANOVA.
+   * 3688: Mann-Whitney test.
+   * 4099: hidden Markov model.  bootstrap.
+   * 4339: coefficients of determination.  
+   * 2802: ANOVA F test.  t-test.  imputation.
+   * 1897: (none mentioned)
+   * 3987: linear regression model.  prior distribution.  Markov chain.  ANOVA.  parametric Pearson's correlation test.  non-parametric Spearman's rho test.  exact test.
+   * 3940: significance analysis of microarrays.
+   * 4247: t-test.
+   * 1658: (none metioned)
+   * 2155: T test
+   
+
+```{r, eval=FALSE,echo=FALSE }
+
+path_samp=c(3467,2314,1019,2987,2940,1518,4433,1508,3698,5026,2426,216)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Pathogens"'),sort='publication_date asc', start=216, limit=1)$data$materials_and_methods
+
+```
+
+**Techniques used in sampled PLoS Pathogens Articles:**
+
+   * 3467: t-test.  ANOVA.
+   * 2314: ANOVA. Kruskal-Wallis with Dunn's multiple comparisons for nonparametric.
+   * 1019: (none mentioned)
+   * 2987: (none mentioned)
+   * 2940: ANOVA. nonparametric t-test.  (What???)
+   * 1518: (none mentioned)
+   * 4433: permutation test.  Benjamini-Hochberg for multiple testing.
+   * 1508: (none mentioned)
+   * 3698: t test.  ANOVA.
+   * 5026: generalized linear model with a negative binomial distribution.  Benjamini-Hochberg.  clustering analysis.  generalized linear mixed model. ANOVA.  linear mixed effect regression.  Spearman rank-order correlation.
+   * 2426: t-test.  linear regression.
+   * 216: (none mentioned)
+   
+
+```{r , eval=FALSE,echo=FALSE}
+
+ntd_samp=c(107,2473,1075,1789,1321,3702,4214,2995,932,563,4572,3237)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Neglected Tropical Diseases"'),sort='publication_date asc', start=3237, limit=1)$data$materials_and_methods
+
+```
+
+**Techniques used in sampled PLoS Neglected Tropical Diseases articles:**
+
+   * 107: generalized linear model, Poisson distribution, log link function.  Kaplan-Meier curve.  Cox proportional hazards.  autoregressive model.
+   * 2473: Fisher exact test.  nonparametric Mann-Whitney test.
+   * 1075: Log-rank Mantel-Cox test to compare survival curves.  nonparametric Mann-Whitney.
+   * 1789: (none mentioned)
+   * 1321: chi-square.  ANOVA.  chi-square regression.  exact confidence intervals.  logistic regression.
+   * 3702: unsupervised classification, k-means.  confusion matrix.
+   * 4214: chi-square.  t test. principal components analysis.  logistic regression.
+   * 2995: (none mentioned)
+   * 932: Pearson's chi-squared.
+   * 563: t test.  Mann-Whitney-Wilcoxon.
+   * 4572: ANOVA
+   * 3237: ANOVA with Tukey's post-hoc test.  t test.  2-way repeated measure ANOVA.
+   
+
+Next we distill the above catalog of techniques into a list of keywords of interest.
+
+**List of keywords:**
+
+   * ANOVA
+   * Benjamini-Hochberg
+   * bootstrap
+   * chi-square
+   * clustering
+   * Cox proportional hazards
+   * cross validation
+   * exact confidence intervals
+   * Fisher exact test
+   * generalized linear model
+   * Kaplan-Meier
+   * kernel density
+   * k-means
+   * linear mixed model
+   * linear regression
+   * logistic regression
+   * Mann-Whitney
+   * Monte Carlo
+   * principal components analysis
+   * ROC curve
+   * simulation
+   * t test
+   
+### Table of counts and proportions for each keyword-journal pair   
+   
+```{r, echo=FALSE}
+
+wj_df=data.frame( c( "356 (.150)", "17 (.007)", "165 (.070)", "74 (.031)", "378 (.160)", "11 (.005)", "48 (.020)", "55 (.023)", "75 (.032)", "32 (.014)", "22 (.009)", "16 (.007)", "118 (.050)", "41 (.017)", "120 (.051)", "86 (.036)", "50 (.021)", "14 (.006)", "356 (.150)", "1469 (.621)", "2367 (1.00)" ),
+ c( "100 (.072)", "13 (.009)", "97 (.070)", "184 (.133)", "285 (.206)", "135 (.098)", "35 (.025)", "120 (.087)", "31 (.022)", "134 (.097)", "3 (.002)", "21 (.015)", "176 (.127)", "330 (.239)", "97 (.070)", "79 (.057)", "55 (.040)", "34 (.025)", "157 (.114)", "1093 (.791)", "1381 (1.00)" ),  
+c( "147 (.031)", "71 (.015)", "300 (.063)", "86 (.018)", "1150 (.242)", "16 (.003)", "356 (.075)", "113 (.024)", "53 (.011)", "16 (.003)", "94 (.020)", "11 (.002)", "223 (.047)", "95 (.020)", "88 (.019)", "452 (.095)", "238 (.050)", "154 (.032)", "2608 (.549)", "2191 (.462)", "4747 (1.00)"  ),
+c( "741 (.119)", "171 (.028)", "453 (.073)", "409 (.066)", "1237 (.199)", "57 (.009)", "104 (.017)", "458 (.074)", "96 (.015)", "99 (.016)", "65 (.010)", "97 (.016)", "468 (.075)", "277 (.045)", "333 (.054)", "144 (.023)", "405 (.065)", "50 (.008)", "634 (.102)", "4353 (.702)", "6205 (1.00)"   ),
+c( "978 (.185)", "81 (.015)", "264 (.050)", "137 (.026)", "559 (.106)", "19 (.004)", "31 (.006)", "188 (.036)", "53 (.010)", "216 (.041)", "18 (.003)", "33 (.006)", "240 (.045)", "66 (.012)", "676 (.128)", "107 (.020)", "64 (.012)", "17 (.003)", "225 (.043)", "3729 (.706)", "5280 (1.00)" ),
+c("634 (.133)", "49 (.010)", "422 (.088)", "680 (.142)", "821 (.172)", "36 (.008)", "94 (.020)", "499 (.104)", "126 (.026)", "134 (.028)", "15 (.003)", "56 (.012)", "317 (.066)", "623 (.130)", "653 (.137)", "252 (.053)", "158 (.033)", "200 (.042)", "367 (.077)", "3958 (.828)", "4780 (1.00)"  ) )
+
+names(wj_df)=c("Biology", "Medicine", "Comp.Bio.","Genetics","Pathogens", "N.T.Diseases")
+
+row.names(wj_df)=c("ANOVA","Benjamini-Hochberg","bootstrap", "chi square","clustering", "Cox prop. hazards", "cross validation", "Fisher exact test", "GLM", "Kaplan-Meier","k-means" ,"linear mixed model", "linear regression","logistic regression", "Mann-Whitney","Monte Carlo", "PCA", "ROC", "simulation", "t test", "TOTAL")
+
+kable(wj_df,align='rrrrrr',caption="**Total number (proportion) of journal's research articles containing the keyword.**  The first number in each cell is the total number of research articles published in the given journal in which the keyword appears in the Materials and Methods section.  The second number is the proportion of all research articles in that journal that contain the keyword.")
+
+
+```
+
+

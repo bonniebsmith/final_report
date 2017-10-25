@@ -1,0 +1,808 @@
+---
+title: "Code for class project"
+author: "Bonnie Smith"
+date: "October 16, 2017"
+output: html_document
+---
+
+We need to use the development version of `rplos` from github in order for the `searchplos` function to work.
+
+```{r , message=FALSE,eval=FALSE}
+
+install.packages("devtools")
+devtools::install_github("ropensci/rplos")
+
+```
+
+```{r ,message=FALSE}
+
+
+library(rplos)
+library(knitr)
+library(stringr)
+library(rebus)
+library(ggplot2)
+
+```
+
+### 1. Obtaining counts by journal
+
+We obtain counts by journal for the number of articles in our dataset, using the `searchplos` function in the `rplos` package.
+
+```{r searchplos}
+
+#### Check that the filters in searchplos return the desired results
+
+searchplos(q="*:*", fl=c("journal", "doc_type","article_type","publication_date"),
+       fq=list('journal:"PLoS Genetics"', 'doc_type:full', 'article_type:"Research Article"'), sort="publication_date asc", limit=4)
+
+```
+
+```{r total journal counts,eval=FALSE}
+
+### For each of the 6 journals of interest, find the total number of 
+###     research articles that have appeared over the life of the journal
+
+counts=lapply( journal_list, function(x) searchplos(q="*",fq=list(x, 'doc_type:full',
+           'article_type:"Research Article"'))$meta$numFound )
+
+kable(matrix(counts,nrow=1),col.names=c("PLos Bio","PLoS Medicine", "PLoS Comp. Bio.","PLoS Genetics","PLoS Pathogens","PLoS Trop. Diseases"),caption="Total number of research articles that have appeared in each PLoS journal")
+
+
+###  Restrict to articles that contain a Materials and Methods section
+
+counts_mm= lapply( journal_list, function(x) searchplos(q="*",fq=list(x, 'doc_type:full',
+           'article_type:"Research Article"','materials_and_methods:*'))$meta$numFound )
+
+kable(matrix(counts_mm,nrow=1),col.names=c("PLos Bio","PLoS Medicine", "PLoS Comp. Bio.","PLoS Genetics","PLoS Pathogens","PLoS Trop. Diseases"),caption="Total number of research articles that have appeared in each PLoS journal")
+
+```
+
+### 2. Building the keyword list
+
+We begin by taking a random sample of 12 research articles from each of the 6 journals, filtering on those journals that contain a materials and methods section.
+
+```{r sampling,eval=FALSE}
+
+sample(1:2344,12)
+sample(1:1370,12)
+sample(1:4377,12)
+sample(1:6165,12)
+sample(1:5266,12)
+sample(1:4746,12)
+
+```
+
+The results are fixed and recorded below.  Next we read in the Materials and Methods section for each article in our sample.  Each article is listed by its index when the research articles (having a materials and methods section) from that journal are listed chronologically by publication date.  Note that due to constraints of working with the PLoS API, we read in one methods section at a time (to avoid a Server Error message).
+
+```{r ,eval=FALSE}
+
+bio_samp=c(1000,1243,1986,1334,310,343,2063,1775,1587,1487,1287,439)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Biology"'),sort='publication_date asc', start=439, limit=1)$data$materials_and_methods
+
+```
+
+```{r ,eval=FALSE}
+
+med_samp=c(31,1335,81,803,989,757,227,962,108,263,838,594)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Medicine"'),sort='publication_date asc', start=594, limit=1)$data$materials_and_methods
+
+```
+
+```{r , eval=FALSE}
+
+cb_samp=c(3711,3024,836,128,2225,4308,1442,1585,1283,695,2839,3539)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Computational Biology"'),sort='publication_date asc', start=3539, limit=1)$data$materials_and_methods
+
+```
+
+```{r,eval=FALSE }
+
+gen_samp=c(4649,3182,3688,4099,4339,2802,1897,3987,3940,4247,1658,2155)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Genetics"'),sort='publication_date asc', start=2155, limit=1)$data$materials_and_methods
+
+```
+
+```{r, eval=FALSE }
+
+path_samp=c(3467,2314,1019,2987,2940,1518,4433,1508,3698,5026,2426,216)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Pathogens"'),sort='publication_date asc', start=216, limit=1)$data$materials_and_methods
+
+```
+
+```{r , eval=FALSE}
+
+ntd_samp=c(107,2473,1075,1789,1321,3702,4214,2995,932,563,4572,3237)
+
+searchplos(q="materials_and_methods:*",fl=c('journal','materials_and_methods'), fq=c("doc_type:full", 'article_type:"Research Article"', 'journal:"PLoS Neglected Tropical Diseases"'),sort='publication_date asc', start=3237, limit=1)$data$materials_and_methods
+
+```
+
+Based on the results, we construct our list of keywords of interest (see the Supplemental Materials for the full catalog of techniques observed during sampling).
+
+
+```{r lists }
+
+### list for searching by journal
+
+journal_list=c('journal:"PLoS Biology"','journal:"PLoS Medicine"','journal:"PLoS Computational Biology"','journal:"PLoS Genetics"','journal:"PLoS Pathogens"','journal:"PLoS Neglected Tropical Diseases"')
+
+### list for searching keywords
+
+word_list=c('materials_and_methods:ANOVA','materials_and_methods:"Benjamini-Hochberg"','materials_and_methods:"bootstrap"','materials_and_methods:"chi square"','materials_and_methods:clustering', 'materials_and_methods:"Cox proportional hazards"','materials_and_methods:"cross validation"','materials_and_methods:"Fisher exact test"', 'materials_and_methods:"generalized linear model"','materials_and_methods:"Kaplan-Meier"', 'materials_and_methods:"k-means"', 'materials_and_methods:"linear mixed model"','materials_and_methods:"linear regression"','materials_and_methods:"logistic regression"',   'materials_and_methods:"Mann-Whitney"', 'materials_and_methods:"Monte Carlo"', 'materials_and_methods:"principal components"', 'materials_and_methods:"ROC"','materials_and_methods:simulation',  'materials_and_methods:"t test"')
+
+```
+
+
+### 3.  Counts and proportions for keyword-journal pairs
+
+Next we get total article counts for each keyword-journal pairing.  This is done in small batches, a few keywords at a time, to keep the PLoS API happy. (Adding a longer sleep time did not prevent a Server Error when we tried a for loop, looping over the 20 keywords, hence the clumsy workaround.)
+
+```{r word counts,eval=FALSE }
+
+n=1
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=2
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=3
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=4
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+```
+
+```{r, eval=FALSE }
+
+n=5
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=6
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=7
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+```
+
+```{r,eval=FALSE }
+
+n=8
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+
+n=9
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+
+n=10
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+```
+
+```{r, eval=FALSE }
+
+n=11
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=12
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=13
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=14
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+```
+
+```{r, eval=FALSE }
+n=15
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=16
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=17
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+
+```
+
+```{r, eval=FALSE }
+
+n=18
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+n=19
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+n=20
+lapply(journal_list, function(x) searchplos(q=word_list[n],fl="publication_date",
+       fq= list('doc_type:full', 'article_type:"Research Article"',x))$meta$numFound) 
+
+```
+
+The results of the preceding queries are recorded below.  For n=1 to 20, wn is the 6-tuple of counts showing the number of articles containing the nth word in our keylist, for each of the 6 journals.
+
+```{r counts wj table}
+
+#### For n=1 to 20, the vector wn gives the number of
+####   articles with word n in each journal
+
+w1=c(356,100,147,741,978,634)
+w2=c(17,13,71,171,81,49)
+w3=c(165,97,300,453,264,422)
+w4=c(74,184,86,409,137,680)
+
+w5=c(378,285,1150,1237,559,821)
+w6=c(11,135,16,57,19,36)
+w7=c(48,35,356,104,31,94)
+
+w8=c(55,120,113,458,188,499)
+w9=c(75,31,53,96,53,126)
+w10=c(32,134,16,99,216,134)
+
+w11=c(22,3,94,65,18,15)
+w12=c(16,21,11,97,33,56)
+w13=c(118,176,223,468,240,317)
+w14=c(41,330,95,277,66,623)
+
+w15=c(120,97,88,333,676,653)
+w16=c(86,79,452,144,107,252)
+w17=c(50,55,238,405,64,158)
+
+w18=c(14,34,154,50,17,200)
+w19=c(356,157,2608,634,225,367)
+w20=c(1469,1093,2191,4354,3729,3958)
+
+total=c(2367,1381,4747,6205,5280,4780)
+
+```
+
+We form the matrix of counts, and also the matrix showing what proportion of all of the journal's articles use the keyword.
+
+```{r }
+
+### The matrix of counts for each word-journal pair
+
+C=t(matrix(c(w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19,w20,total),nrow=6))
+
+C
+
+### The matrix of proportions for each word-journal pair (out of
+###    the total number of research articles for that journal)
+
+P=round(t(matrix(c(w1/total,w2/total,w3/total,w4/total,w5/total,w6/total,w7/total,w8/total,w9/total,w10/total,w11/total,w12/total,w13/total,w14/total,w15/total,w16/total,w17/total,w18/total,w19/total,w20/total),nrow=6)),3)
+
+P
+
+P_trim=P[c(1,3:8,10,13:17,19,20),]
+
+```
+
+Results are recorded together for convenience:
+
+```{r, echo=FALSE}
+
+wj_df=data.frame( c( "356 (.150)", "17 (.007)", "165 (.070)", "74 (.031)", "378 (.160)", "11 (.005)", "48 (.020)", "55 (.023)", "75 (.032)", "32 (.014)", "22 (.009)", "16 (.007)", "118 (.050)", "41 (.017)", "120 (.051)", "86 (.036)", "50 (.021)", "14 (.006)", "356 (.150)", "1469 (.621)", "2367 (1.000)" ),
+ c( "100 (.072)", "13 (.009)", "97 (.070)", "184 (.133)", "285 (.206)", "135 (.098)", "35 (.025)", "120 (.087)", "31 (.022)", "134 (.097)", "3 (.002)", "21 (.015)", "176 (.127)", "330 (.239)", "97 (.070)", "79 (.057)", "55 (.040)", "34 (.025)", "157 (.114)", "1093 (.791)", "1381 (1.000)" ),  
+c( "147 (.031)", "71 (.015)", "300 (.063)", "86 (.018)", "1150 (.242)", "16 (.003)", "356 (.075)", "113 (.024)", "53 (.011)", "16 (.003)", "94 (.020)", "11 (.002)", "223 (.047)", "95 (.020)", "88 (.019)", "452 (.095)", "238 (.050)", "154 (.032)", "2608 (.549)", "2191 (.462)", "4747 (1.000)"  ),
+c( "741 (.119)", "171 (.028)", "453 (.073)", "409 (.066)", "1237 (.199)", "57 (.009)", "104 (.017)", "458 (.074)", "96 (.015)", "99 (.016)", "65 (.010)", "97 (.016)", "468 (.075)", "277 (.045)", "333 (.054)", "144 (.023)", "405 (.065)", "50 (.008)", "634 (.102)", "4353 (.702)", "6205 (1.000)"   ),
+c( "978 (.185)", "81 (.015)", "264 (.050)", "137 (.026)", "559 (.106)", "19 (.004)", "31 (.006)", "188 (.036)", "53 (.010)", "216 (.041)", "18 (.003)", "33 (.006)", "240 (.045)", "66 (.012)", "676 (.128)", "107 (.020)", "64 (.012)", "17 (.003)", "225 (.043)", "3729 (.706)", "5280 (1.000)" ),
+c("634 (.133)", "49 (.010)", "422 (.088)", "680 (.142)", "821 (.172)", "36 (.008)", "94 (.020)", "499 (.104)", "126 (.026)", "134 (.028)", "15 (.003)", "56 (.012)", "317 (.066)", "623 (.130)", "653 (.137)", "252 (.053)", "158 (.033)", "200 (.042)", "367 (.077)", "3958 (.828)", "4780 (1.000)"  ) )
+
+```
+
+```{r ,eval=FALSE}
+
+names(wj_df)=c("PLoS Biology", "PLoS Medicine", "PLoS Comp Bio","PLoS Genetics","PLoS Pathogens", "PLoS NTD")
+
+row.names(wj_df)=c("ANOVA","Benjamini-Hochberg","bootstrap", "chi square","clustering", "Cox proportional hazards", "cross validation", "Fisher exact test", "generalized linear model","Kaplan-Meier", "k-means", "linear mixed model", "linear regression","logistic regression", "Mann-Whitney","Monte Carlo", "principal components", "ROC", "simulation", "t test", "TOTAL")
+
+
+kable(wj_df,align='rrrrrr',caption="Table 3: **Total number (proportion) of journal's research articles containing the keyword.**  The first number in each cell is the total number of research articles published in the given journal in which the keyword appears in the Materials and Methods section.  The second number is the proportion of all research articles in that journal that contain the keyword.")
+
+```
+
+Table showing articles with missing Methods sections:
+
+```{r missingness }
+
+ counts_all=c(2367,1381,4747,6205,5280,4780)
+ counts_mm=c(2344,1370,4377,6165,5266,4746)
+ perc_mis=round(100*(counts_all-counts_mm)/counts_all, 2)
+ percent_missing=c(.97,.8,7.79,.64,.27,.71)
+ 
+x=data.frame(c("2367","2344",".97"),c("1381","1370",".8"),c("4747","4377","7.79"),c("6205","6165",".64"), c("5280","5266",".27"),c("4780","4746",".71"))
+ 
+row.names(x)=c("Total # of articles", "# articles with a methods section", "% articles with no methods section")
+
+kable(x,col.names=c("Biology","Medicine", "Comp. Bio.","Genetics","Pathogens","N.T.D."),align='cccccc', caption="**Counts of research articles, and percent missingness.**  For each journal, the total number of research articles, and the total number of research articles that contain a Materials and Methods section are shown, as well as the percent of that journal's research articles that are missing a Materials and Methods section.")
+ 
+``` 
+
+### 4. Code for results section
+
+Code for Figure 1 of the report:
+
+```{r ,graph,fig.align='center',fig.width=6.3,fig.height=6.5 }
+
+V=as.vector(P_trim)
+
+words=c("ANOVA","Bootstrap", "Chi Square","Clustering", "Cox Prop Hazards", "Cross Validation", "Fisher Exact Test","Kaplan-Meier", "Linear Regression","Logistic Regression", "Mann-Whitney","Monte Carlo", "PCA", "Simulation", "T-Test")
+
+word_df=data.frame(rep(words,6), c(rep("PLoS Biology",15),rep("PLoS Medicine",15), rep("PLoS Comp Bio",15), rep("PLoS Genetics",15), rep("PLoS Pathogens",15), rep("PLoS N.T.Diseases",15) ), V)
+
+names(word_df)=c("word","Journal","Proportions")
+
+my_palette=c("#FF9933","#9944BB","#009E73", "#EE5533", "#F0E442","#3388FF")
+
+ggplot(word_df,aes(x=Journal,fill=Journal,y=Proportions))+geom_bar(stat="identity")+facet_wrap(~word,nrow=3)+scale_x_discrete(labels=c("PLoS Biology"="B", "PLoS Comp Bio"="C", "PLoS Genetics"="G", "PLoS Medicine"="M", "PLoS N.T.Diseases"="N", "PLoS Pathogens"="P"))+labs(y="Proportion of the journal's research articles containing the keyword", title="Comparing usage of statistical techniques across journals")+scale_fill_manual(values=my_palette)+theme(plot.title=element_text(hjust=.5),legend.position="bottom",legend.title=element_blank(),legend.background=element_rect(colour="grey50"), strip.background=element_rect(fill=NA),panel.background=element_rect(fill="white",color="grey20"))
+
+```
+
+Code for table of standard deviations:
+
+```{r}
+
+sdVec=vector(length=15)
+for(n in 1:15){
+     sdVec[n]=round(sd(P_trim[n,]),3)
+}
+
+sd_df_1=as.data.frame(t(sdVec[1:8]))
+
+names(sd_df_1)=c("ANOVA","Bootstrap","Chi square","Clustering","Cox prop.", "Cross val.","Fisher exact","Kaplan-Meier" )
+                
+kable(sd_df_1,align="cccccccc",caption="**Standard deviation in journal proportions for each keyword.**  For each keyword, we compute the standard deviation in the 6 values of proportionate usage by journal.")        
+
+sd_df_2=as.data.frame(t(sdVec[9:15]))
+
+names(sd_df_2)=c("Linear regr.", "Logistic regr.", "Mann-Whitney", "Monte Carlo", "PCA", "Simulation", "T test")
+
+kable(sd_df_2,align="ccccccc")
+
+```
+ 
+Code for table of differences between each pair of journals:
+                                                                                      
+```{r }
+
+sums_by_journal=vector(length=6)
+for(n in 1:6){
+      sums_by_journal[n]=sum(P[,n])
+}
+
+
+journal_Matrix=matrix(nrow=6,ncol=6)
+for(n in 1:6){
+     for(m in 1:6){
+          journal_Matrix[n,m]=round(sum((P[,m]-P[,n])^2),3)
+     }
+}
+
+
+difference=vector(length=6)
+for(j in 1:6){
+     difference[j]=sum(journal_Matrix[j,])
+}
+
+diff_df=data.frame(journal_Matrix[,1],journal_Matrix[,2],journal_Matrix[,3],journal_Matrix[,4],journal_Matrix[,5],journal_Matrix[,6],difference)
+
+row.names(diff_df)=c("Bio","Med","CB","Gen","Path","NTD")
+names(diff_df)=c("Bio","Med","CB","Gen","Path","NTD", "Row Sums")
+
+kable(diff_df,caption="Pairwise 'distance' in keyword usage between journals")
+
+```                      
+
+### 5:  Time specific information
+
+Next, we make comparisons between two time periods of interest:  2009-2010, and 2016-2017.  For certain word-journal pairs, we extract the counts for articles published in each of these time periods.  This is straightforward if the total count for that word-journal pair is < 1000.  (1000 is the maximum number of articles that the `searchplos` function will return on a single call.)  Otherwise, the query must be done in batches of <1000, and the results summed.
+
+We also obtain the total counts of articles for each journal for these two time periods, since, as before, our interest will be in the proportion of articles that use the keyword.
+
+```{r ,eval=FALSE}
+
+###  PLoS Biology
+
+j=1
+for(w in c(1,3,5,13,15,19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+list=searchplos(word_list[20],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900, limit=600, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+
+for(n in 1:3){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+The results of the preceding queries are recorded below.
+
+
+
+
+```{r, eval=FALSE}
+
+### PLoS Medicine
+
+j=2
+for(w in c(4,5,6,10,13,14,19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+list=searchplos(word_list[20],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900, limit=600, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+
+for(n in 1:2){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+
+
+```{r, eval=FALSE}
+
+### PLoS Computational Bio
+
+j=3
+for(w in c(3,5,7,16,17,19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(w in c(5,19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900, limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(w in c(19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=1800, limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 1:6){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+
+
+```{r, eval=FALSE}
+
+### PLoS Genetics 
+
+j=4
+for(w in c(1,3,5,8,13,19,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(w in c(5,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900, limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 3:5){
+list=searchplos(word_list[20],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900*(n-1), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[20], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 1:7){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+
+```{r, eval=FALSE}
+
+### PLoS Pathogens
+
+j=5
+for(w in c(1,3,5,13,15,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+n=2
+list=searchplos(word_list[1],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900*(n-1), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[1], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+
+for(n in 2:5){
+list=searchplos(word_list[20],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900*(n-1), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[20], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 1:6){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+
+```{r, eval=FALSE}
+
+### PLoS N.T.Diseases
+
+j=6
+for(w in c(1,3,4,5,8,14,15,20)){
+list=searchplos(word_list[w],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[w], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 2:5){
+list=searchplos(word_list[20],fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=900*(n-1), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(word_list[20], sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+for(n in 1:6){
+list=searchplos(q='*',fl="publication_date", 
+           fq= list('doc_type:full','article_type:"Research Article"', journal_list[j]), start=(n*900-900), limit=900, sort='publication_date asc' )$data$publication_date
+
+print( c(sum(str_detect(list,pattern=or("2009","2010") ) ), sum(str_detect(list,pattern=or("2016","2017"))), sum(str_detect(list,pattern="20")) ) )
+}
+
+```
+
+
+
+```{r ,echo=FALSE}
+
+### Biology graph
+
+old_b=round(c(64,22,57,19,16,54,232)/378,3)
+
+new_b=round(c(73,25,72,24,23,59,206)/281,3)
+
+#Bio_change=sum(abs(new_b-old_b))
+
+Bio_time_df=data.frame(rep(c("ANOVA", "bootstrap", "clustering","linear regr.", "Mann-Whit.", "simulation", "t test"),2),c(rep("2009-2010",7),rep("2016-2017",7)), c(old_b,new_b))
+
+names(Bio_time_df)=c("Word","Time","Proportion")
+
+my_palette2=c("#FF9933","#2299EE")
+
+Bio_plot=ggplot(Bio_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position=c(.3,.7),legend.title=element_blank(), axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+ labs(title="PLoS Biology",y="",x="")+ylim(0,1)
+
+```
+ 
+
+ 
+```{r ,echo=FALSE}
+
+### Medicine graph
+
+old_m=round(c(37,30,15,18,6,42,30,135)/165,3)
+
+new_m=round(c(39,72,32,25,51,75,30,229)/276,3)
+
+#Med_change=sum(abs(new_m-old))
+
+Med_time_df=data.frame(rep(c("chi square", "clustering", "Cox", "Kaplan-Meier","linear regr.", "logistic regr.", "simulation", "t test"),2),c(rep("2009-2010",8),rep("2016-2017",8)), c(old_m,new_m))
+
+names(Med_time_df)=c("Word","Time","Proportion")
+
+Med_plot=ggplot(Med_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position="none",axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+labs(title="PLoS Medicine",y="",x="")+ylim(0,1)
+ 
+```
+
+```{r,echo=FALSE}
+
+### Comp. Bio. graph
+
+old_c=round(c(46,181,51,57,36,383,334)/735,3)
+
+new_c=round(c(67,212,90,99,51,560,476)/1002,3)
+
+#CB_change=sum(abs(new-old))
+
+CB_time_df=data.frame(rep(c("bootstrap", "clustering", "cross  val.", "Monte Carlo","PCA", "simulation", "t test"),2),c(rep("2009-2010",7),rep("2016-2017",7)), c(old_c,new_c))
+
+names(CB_time_df)=c("Word","Time","Proportion")
+
+CB_plot=ggplot(CB_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position="none", axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+labs(title="PLoS Computational Biology",y="Proportion of Articles",x="")+ylim(0,1)
+
+``` 
+
+```{r,echo=FALSE}
+
+### Genetics graph
+
+old_g=round(c(74,71,176,53,71,97,611)/885,3)
+
+new_g=round(c(182,73,219,86,85,101,813)/1121,3)
+
+#Gen_change=sum(abs(new-old))
+
+Gen_time_df=data.frame(rep(c("ANOVA", "bootstrap", "clustering", "Fisher exact", "linear regr.", "simulation", "t test"),2),c(rep("2009-2010",7),rep("2016-2017",7)), c(old_g,new_g))
+
+names(Gen_time_df)=c("Word","Time","Proportion")
+
+Gen_plot=ggplot(Gen_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position="none", axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+labs(title="PLoS Genetics",y="",x="")+ylim(0,1)
+
+```
+   
+```{r ,echo=FALSE}
+
+### Pathogens graph
+
+old_p=round(c(120,49,102,44,104,613)/909,3)
+
+new_p=round(c(265,48,113,48,161,777)/1028,3)
+
+#Path_change=sum(abs(new-old))
+
+Path_time_df=data.frame(rep(c("ANOVA", "bootstrap", "clustering", "linear regr.", "Mann-Whit.", "t test"),2),c(rep("2009-2010",6),rep("2016-2017",6)), c(old_p,new_p))
+
+names(Path_time_df)=c("Word","Time","Proportion")
+
+Path_plot=ggplot(Path_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position="none", axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+labs(title="PLoS Pathogens",y="",x="")+ylim(0,1)
+ 
+```
+   
+```{r ,echo=FALSE}
+
+### N.T.Diseases graph
+
+old_n=round(c(55,34,61,81,37,65,65,391)/485,3)
+
+new_n=round(c(184,124,205,261,164,178,198,1153)/1424,3)
+
+#NTD_change=sum(abs(new-old))
+
+NTD_time_df=data.frame(rep(c("ANOVA","bootstrap" ,"chi square", "clustering", "Fisher exact", "logistic regr.", "Mann-Whit.", "t test"),2),c(rep("2009-2010",8),rep("2016-2017",8)), c(old_n,new_n))
+
+names(NTD_time_df)=c("Word","Time","Proportion")
+
+NTD_plot=ggplot(NTD_time_df,aes(x=Word,y=Proportion,fill=Time))+geom_bar(stat="identity",position="dodge",colour="black")+scale_fill_manual(values=my_palette2)+theme(legend.position="none", axis.text.x=element_text(angle=315,vjust=1,hjust=0),panel.background=element_rect(fill="white",colour="grey40"))+labs(title="PLoS N.T.Diseases",y="",x="")+ylim(0,1)
+ 
+```   
+
+**NOTE!!!**
+In order to plot the 6 graphs that we made above as a single unit, we use a function called `multiplot`, retrieved from the wesite http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/ .
+
+**The code for this function is copied from the website and pasted below.**
+
+```{r }
+
+####### Multiplot function from www.cookbook-r.com
+#######    NOT my own code!!
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+```
+
+**Prevalance of selected statistical techniques in PLoS journals, 2009-10 vs. 2016-17**
+
+```{r, fig.height=12,fig.width=6.5,fig.align="center",echo=FALSE}
+
+multiplot(Bio_plot,Med_plot,CB_plot,Gen_plot,Path_plot,NTD_plot,cols=2)
+
+```
+
+Code for last table:
+
+```{r ,echo=FALSE}
+
+time_table=as.data.frame(matrix(c(sum(old_b),sum(old_m),sum(old_c),sum(old_g),sum(old_p),sum(old_n),sum(new_b),sum(new_m),sum(new_c),sum(new_g),sum(new_p),sum(new_n), sum(new_b-old_b),sum(new_m-old_m),sum(new_c-old_c),sum(new_g-old_g),sum(new_p-old_p),sum(new_n-old_n),sum(abs(new_b-old_b)),sum(abs(new_m-old_m)),sum(abs(new_c-old_c)),sum(abs(new_g-old_g)),sum(abs(new_p-old_p)),sum(abs(new_n-old_n))),nrow=4,byrow=TRUE))
+
+names(time_table)=c("Biology","Medicine","Comp.Bio.","Genetics","Pathogens","N.T.Diseases")
+
+row.names(time_table)=c("Sum for 2009-10","Sum for 2016-17","Sum of changes","Sum of |changes|")
+
+
+kable(time_table,caption="**Changes in usage between 2009-10 to 2016-17, by journal.**  Each measure is summed over the keywords chosen for that journal, as displayed in Figure 2.")
+
